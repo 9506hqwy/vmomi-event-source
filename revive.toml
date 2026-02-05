@@ -1,0 +1,9 @@
+enableAllRules = true
+errorCode = 1
+warningCode = 2
+
+[rule.exported]
+Disabled = true
+
+[rule.package-comments]
+Disabled = true

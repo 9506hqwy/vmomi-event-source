@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  push:
+    tags: [ '**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu:
+    uses: 9506hqwy/actions/.github/workflows/go-release-ubuntu.yml@main
+
+  windows:
+    uses: 9506hqwy/actions/.github/workflows/go-release-windows.yml@main
+
+  release:
+
+    needs: [ubuntu, windows]
+
+    permissions:
+      contents: write
+
+    uses: 9506hqwy/actions/.github/workflows/common-create-release.yml@main
