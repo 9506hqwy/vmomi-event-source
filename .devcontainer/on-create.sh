@@ -55,3 +55,11 @@ YQ_VERSION=$(curl -fsSL -H "${GITHUB_HEADER_ACCEPT}" -H "${GITHUB_HEADER_VERSION
 curl -fsSL -o - "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64.tar.gz" | \
     tar -zxf - -O "./yq_linux_amd64" > ~/.local/bin/yq
 chmod +x ~/.local/bin/yq
+
+# Install protoc
+PROTOBUF_URL="https://github.com/protocolbuffers/protobuf/releases/download/v33.5/protoc-33.5-linux-x86_64.zip"
+curl -fsSL -o /tmp/protoc.zip "${PROTOBUF_URL}"
+unzip -d ~/.local /tmp/protoc.zip
+
+# Install protoc-gen-go
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest

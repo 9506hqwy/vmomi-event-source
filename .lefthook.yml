@@ -16,6 +16,10 @@ pre-commit:
       glob: "*.go"
       run: go test ./...
 
+    - name: Proto
+      glob: "configs/message.proto"
+      run: protoc --go_out=./pkg configs/message.proto && git diff --exit-code --quiet pkg
+
     - name: Actions Lint
       glob: ".github/workflows/*.yml"
       run: actionlint

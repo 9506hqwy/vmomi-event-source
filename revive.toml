@@ -7,3 +7,6 @@ Disabled = true
 
 [rule.package-comments]
 Disabled = true
+
+[rule.line-length-limit]
+arguments = [99]
