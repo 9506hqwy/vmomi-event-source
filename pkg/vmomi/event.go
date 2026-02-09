@@ -22,6 +22,8 @@ const (
 	MaxObjectUpdates = int32(1)
 )
 
+const Empty = 0
+
 type Event struct {
 	ComputeResource          *string
 	CreatedTime              time.Time
@@ -57,6 +59,21 @@ type EventLongDescription struct {
 type EventCause struct {
 	Description string   `xml:"description"`
 	Actions     []string `xml:"action"`
+}
+
+type extensionEventType struct {
+	EventTypeID string                      `xml:"eventTypeID"`
+	Description string                      `xml:"description"`
+	Arguments   extensionEventTypeArguments `xml:"arguments,omitempty"`
+}
+
+type extensionEventTypeArguments struct {
+	Argument []extensionEventTypeArgument `xml:"argument"`
+}
+
+type extensionEventTypeArgument struct {
+	Name string `xml:"name"`
+	Type string `xml:"type"`
 }
 
 //revive:disable:cognitive-complexity
@@ -173,7 +190,7 @@ func Poll(ctx context.Context, maxWaitSeconds *int32, ch chan<- *[]Event) error 
 		maxWaitSeconds,
 		collector,
 		func(evts *[]Event) {
-			if len(*evts) != 0 {
+			if len(*evts) != Empty {
 				ch <- evts
 			}
 		},
@@ -250,22 +267,18 @@ func GetEventInfo(ctx context.Context) ([]EventInfo, error) {
 		return nil, err
 	}
 
-	info := make([]EventInfo, len(e.Description.EventInfo))
-	for i, evInfo := range e.Description.EventInfo {
-		var longDesc EventLongDescription
-		err := xml.Unmarshal([]byte(evInfo.LongDescription), &longDesc)
-		if err != nil {
-			slog.WarnContext(ctx, "Could not deserialize long description", "error", err)
-			longDesc = EventLongDescription{}
-		}
-
-		info[i] = EventInfo{
-			Key:             evInfo.Key,
-			Description:     evInfo.Description,
-			Category:        evInfo.Category,
-			LongDescription: longDesc,
-		}
+	ex, err := getExtensionManager(ctx, c)
+	if err != nil {
+		return nil, err
 	}
+
+	eventEx := listExtentionEvent(ex)
+
+	info := make([]EventInfo, len(e.Description.EventInfo)+len(eventEx))
+	collectEvent(ctx, e, &info)
+
+	infoEx := info[len(e.Description.EventInfo):]
+	collectExtensionEvent(ctx, eventEx, &infoEx)
 
 	return info, nil
 }
@@ -342,16 +355,38 @@ func getEventManager(ctx context.Context, c *vim25.Client) (*mo.EventManager, er
 	return &e, nil
 }
 
+func getExtensionManager(ctx context.Context, c *vim25.Client) (*mo.ExtensionManager, error) {
+	if c.ServiceContent.ExtensionManager == nil {
+		return nil, nil
+	}
+
+	pc := property.DefaultCollector(c)
+
+	var e mo.ExtensionManager
+	_, err := sx.ExecCallAPI(
+		ctx,
+		func(cctx context.Context) (int, error) {
+			return 0, pc.RetrieveOne(
+				cctx,
+				*c.ServiceContent.ExtensionManager,
+				[]string{"extensionList"},
+				&e,
+			)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &e, nil
+}
+
 func getEventSeverity(em *mo.EventManager, evt *types.BaseEvent) string {
 	if e, ok := (*evt).(*types.EventEx); ok && e.Severity != "" {
 		return e.Severity
 	}
 
-	typeID := strings.TrimPrefix(fmt.Sprintf("%T", *evt), "*types.")
-	if e, ok := (*evt).(*types.ExtendedEvent); ok && e.EventTypeId != "" {
-		typeID = e.EventTypeId
-	}
-
+	typeID := getEventTypeID(evt)
 	return getCategoryKey(em, typeID)
 }
 
@@ -387,6 +422,76 @@ func getEventTypeID(evt *types.BaseEvent) string {
 
 	typeID := strings.TrimPrefix(fmt.Sprintf("%T", *evt), "*types.")
 	return typeID
+}
+
+func listExtentionEvent(em *mo.ExtensionManager) []*types.ExtensionEventTypeInfo {
+	eventEx := []*types.ExtensionEventTypeInfo{}
+	if em == nil {
+		return eventEx
+	}
+
+	for _, ext := range em.ExtensionList {
+		if ext.EventList != nil {
+			for _, evInfo := range ext.EventList {
+				eventEx = append(eventEx, &evInfo)
+			}
+		}
+	}
+
+	return eventEx
+}
+
+func collectEvent(ctx context.Context, e *mo.EventManager, info *[]EventInfo) {
+	for i, evInfo := range e.Description.EventInfo {
+		longDesc := EventLongDescription{}
+		if len(evInfo.LongDescription) != Empty {
+			err := xml.Unmarshal([]byte(evInfo.LongDescription), &longDesc)
+			if err != nil {
+				slog.WarnContext(
+					ctx,
+					"Could not deserialize long description",
+					"error", err,
+					"description", evInfo.LongDescription,
+				)
+			}
+		}
+
+		(*info)[i] = EventInfo{
+			Key:             evInfo.Key,
+			Description:     evInfo.Description,
+			Category:        evInfo.Category,
+			LongDescription: longDesc,
+		}
+	}
+}
+
+func collectExtensionEvent(
+	ctx context.Context,
+	evts []*types.ExtensionEventTypeInfo,
+	info *[]EventInfo,
+) {
+	for i, evInfo := range evts {
+		eventType := extensionEventType{}
+		if len(evInfo.EventTypeSchema) != Empty {
+			err := xml.Unmarshal([]byte(evInfo.EventTypeSchema), &eventType)
+			if err != nil {
+				slog.WarnContext(
+					ctx,
+					"Could not deserialize event type schema",
+					"error", err,
+					"schema", evInfo.EventTypeSchema,
+				)
+				eventType = extensionEventType{}
+			}
+		}
+
+		(*info)[i] = EventInfo{
+			Key:             evInfo.EventID,
+			Description:     eventType.Description,
+			Category:        "",
+			LongDescription: EventLongDescription{},
+		}
+	}
 }
 
 func createEventCollector(

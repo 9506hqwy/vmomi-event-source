@@ -99,6 +99,9 @@ var infoCmd = &cobra.Command{
 				i.Category,
 				i.Description,
 			)
+			if err != nil {
+				log.Fatalf("Print error: %v", err)
+			}
 
 			if i.LongDescription.Description != "" {
 				_, err := fmt.Println(
@@ -115,10 +118,6 @@ var infoCmd = &cobra.Command{
 						log.Fatalf("Print error: %v", err)
 					}
 				}
-			}
-
-			if err != nil {
-				log.Fatalf("Print error: %v", err)
 			}
 		}
 	},
