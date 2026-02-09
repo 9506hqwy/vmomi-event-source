@@ -12,35 +12,48 @@ import (
 	"github.com/9506hqwy/vmomi-event-source/pkg/vmomi"
 )
 
+const Empty = int(0)
+
 func Collect(ctx context.Context) {
 	serviceName, ok := ctx.Value(flag.LokiServiceNameKey{}).(string)
 	if !ok {
 		serviceName = "vmomi-event-source"
 	}
 
+	latestKey := int32(Empty)
+
 	for {
 		ch := make(chan *[]vmomi.Event)
 
 		go func() {
-			Watch(ctx, ch)
+			Watch(ctx, ch, latestKey)
 		}()
 
-		Notify(ctx, ch, serviceName)
+		latestKey = Notify(ctx, ch, serviceName, latestKey)
 
 		// Retry after 3 seconds
 		time.Sleep(time.Duration(3) * time.Second)
 	}
 }
 
-func Watch(ctx context.Context, ch chan<- *[]vmomi.Event) {
-	err := vmomi.Poll(ctx, nil, ch)
+func Watch(ctx context.Context, ch chan<- *[]vmomi.Event, previousKey int32) {
+	err := vmomi.Poll(ctx, nil, ch, previousKey)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to poll events", "error", err)
 	}
 }
 
-func Notify(ctx context.Context, ch <-chan *[]vmomi.Event, serviceName string) {
+func Notify(
+	ctx context.Context,
+	ch <-chan *[]vmomi.Event,
+	serviceName string,
+	previousKey int32,
+) int32 {
+	latestKey := previousKey
+
 	for events := range ch {
+		latestKey = getLastEventKey(events)
+
 		message := ToMessage(events, serviceName)
 
 		err := Post(ctx, message)
@@ -48,6 +61,8 @@ func Notify(ctx context.Context, ch <-chan *[]vmomi.Event, serviceName string) {
 			slog.WarnContext(ctx, "Failed to post event to Loki", "error", err)
 		}
 	}
+
+	return latestKey
 }
 
 func ToMessage(events *[]vmomi.Event, serviceName string) *Message {
@@ -85,8 +100,13 @@ func ToStream(event *vmomi.Event, serviceName string) *Stream {
 
 func CreateMetadata(event *vmomi.Event) []*Metadata {
 	//revive:disable:add-constant
-	metadata := make([]*Metadata, 0, 9)
+	metadata := make([]*Metadata, 0, 10)
 	//revive:enable:add-constant
+
+	metadata = append(metadata, &Metadata{
+		Name:  "internal_key",
+		Value: fmt.Sprint(event.Key),
+	})
 
 	if event.ComputeResource != nil && *event.ComputeResource != *event.Host {
 		metadata = append(metadata, &Metadata{
@@ -151,3 +171,10 @@ func CreateMetadata(event *vmomi.Event) []*Metadata {
 }
 
 //revive:enable:cognitive-complexity
+
+func getLastEventKey(events *[]vmomi.Event) int32 {
+	//revive:disable:add-constant
+	lastEvent := (*events)[len(*events)-1]
+	//revive:enable:add-constant
+	return lastEvent.Key
+}

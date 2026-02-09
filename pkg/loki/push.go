@@ -54,7 +54,11 @@ func Post(ctx context.Context, message *Message) error {
 
 	//revive:disable:add-constant
 	if (*status / 100) != 2 {
-		return fmt.Errorf("failed to post message to loki: status code %d", *status)
+		return fmt.Errorf(
+			"failed to post message to loki: status code %d message=%v",
+			*status,
+			message,
+		)
 	}
 	//revive:enable:add-constant
 

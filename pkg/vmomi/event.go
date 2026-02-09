@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,9 +23,10 @@ const (
 	MaxObjectUpdates = int32(1)
 )
 
-const Empty = 0
+const Empty = int(0)
 
 type Event struct {
+	Key                      int32
 	ComputeResource          *string
 	CreatedTime              time.Time
 	Datacenter               *string
@@ -149,7 +151,14 @@ func Query(ctx context.Context) ([]Event, error) {
 	return ToEvents(e, &events), nil
 }
 
-func Poll(ctx context.Context, maxWaitSeconds *int32, ch chan<- *[]Event) error {
+//revive:disable:cognitive-complexity
+
+func Poll(
+	ctx context.Context,
+	maxWaitSeconds *int32,
+	ch chan<- *[]Event,
+	previousKey int32,
+) error {
 	c, err := login(ctx)
 	if err != nil {
 		close(ch)
@@ -168,7 +177,13 @@ func Poll(ctx context.Context, maxWaitSeconds *int32, ch chan<- *[]Event) error 
 
 	defer destroyEventCollector(ctx, collector)
 
-	err = readyEventCollector(ctx, collector)
+	events, err := readyEventCollector(ctx, c, collector)
+	if err != nil {
+		close(ch)
+		return err
+	}
+
+	err = sendAfterKey(previousKey, events, ch)
 	if err != nil {
 		close(ch)
 		return err
@@ -203,6 +218,8 @@ func Poll(ctx context.Context, maxWaitSeconds *int32, ch chan<- *[]Event) error 
 	close(ch)
 	return nil
 }
+
+//revive:enable:cognitive-complexity
 
 func GetCategories(ctx context.Context) ([]string, error) {
 	c, err := login(ctx)
@@ -289,12 +306,20 @@ func ToEvents(em *mo.EventManager, events *[]types.BaseEvent) []Event {
 		metrics[i] = ToEvent(em, e)
 	}
 
+	sort.Slice(
+		metrics,
+		func(i, j int) bool {
+			return metrics[j].CreatedTime.After(metrics[i].CreatedTime)
+		},
+	)
+
 	return metrics
 }
 
 func ToEvent(em *mo.EventManager, e types.BaseEvent) Event {
 	evt := *e.GetEvent()
 	model := Event{
+		Key:                  evt.Key,
 		CreatedTime:          evt.CreatedTime,
 		FullFormattedMessage: evt.FullFormattedMessage,
 		UserName:             evt.UserName,
@@ -551,7 +576,11 @@ func createLatestEventWatcher(
 	return waiter, filter, nil
 }
 
-func readyEventCollector(ctx context.Context, collector *event.HistoryCollector) error {
+func readyEventCollector(
+	ctx context.Context,
+	c *vim25.Client,
+	collector *event.HistoryCollector,
+) (*[]Event, error) {
 	_, err := sx.ExecCallAPI(
 		ctx,
 		func(cctx context.Context) (int, error) {
@@ -559,20 +588,26 @@ func readyEventCollector(ctx context.Context, collector *event.HistoryCollector)
 		},
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = sx.ExecCallAPI(
+	events, err := sx.ExecCallAPI(
 		ctx,
 		func(cctx context.Context) ([]types.BaseEvent, error) {
 			return collector.ReadNextEvents(cctx, MaxEventCount)
 		},
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	e, err := getEventManager(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	es := ToEvents(e, &events)
+	return &es, nil
 }
 
 func destroyEventCollector(ctx context.Context, collector *event.HistoryCollector) error {
@@ -647,4 +682,34 @@ func waitUpdateForLatestEvent(
 	}
 
 	return nil
+}
+
+func sendAfterKey(key int32, events *[]Event, ch chan<- *[]Event) error {
+	if key == int32(Empty) {
+		return nil
+	}
+
+	if len(*events) == Empty {
+		return nil
+	}
+
+	ch <- filterAfterKey(key, events)
+
+	return nil
+}
+
+func filterAfterKey(key int32, events *[]Event) *[]Event {
+	found := false
+	targets := make([]Event, Empty, len(*events))
+	for _, e := range *events {
+		if found {
+			targets = append(targets, e)
+		}
+
+		if e.Key == key {
+			found = true
+		}
+	}
+
+	return &targets
 }

@@ -21,6 +21,7 @@ Expose event with follow metadata.
 
 | Name                       | Description                           |
 | :------------------------- | :------------------------------------ |
+| internal_key               | Internal key for event                |
 | cluster                    | Cluster name for event source         |
 | datacenter                 | Datacenter name for event source      |
 | datastore                  | Datastore name for event source       |
@@ -101,6 +102,7 @@ docker run -d \
     vmomi-event-source loki collect
 ```
 
-## TODO
+## Notes
 
-- Push events between network disconnected.
+- Occur HTTP 400 error if event happend date is too old.
+  Confgirue `reject_old_samples_max_age`. see [limits_config](https://grafana.com/docs/loki/latest/configure/#limits_config).

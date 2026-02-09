@@ -169,7 +169,7 @@ var waitCmd = &cobra.Command{
 		ch := make(chan *[]vmomi.Event)
 
 		go func() {
-			err := vmomi.Poll(ctx, &timeout, ch)
+			err := vmomi.Poll(ctx, &timeout, ch, 0)
 			if err != nil {
 				log.Fatalf("Poll error: %v", err)
 			}
