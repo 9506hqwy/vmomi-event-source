@@ -8,6 +8,7 @@ import (
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 
 	"github.com/9506hqwy/vmomi-event-source/pkg/flag"
 )
@@ -62,6 +63,22 @@ func Logout(ctx context.Context, c *vim25.Client) error {
 	)
 
 	return err
+}
+
+func GetLocale(ctx context.Context, c *vim25.Client) (*string, error) {
+	sm := session.NewManager(c)
+
+	s, err := ExecCallAPI(
+		ctx,
+		func(cctx context.Context) (*types.UserSession, error) {
+			return sm.UserSession(cctx)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &s.Locale, nil
 }
 
 func ExecCallAPI[T any](

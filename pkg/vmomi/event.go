@@ -63,21 +63,6 @@ type EventCause struct {
 	Actions     []string `xml:"action"`
 }
 
-type extensionEventType struct {
-	EventTypeID string                      `xml:"eventTypeID"`
-	Description string                      `xml:"description"`
-	Arguments   extensionEventTypeArguments `xml:"arguments,omitempty"`
-}
-
-type extensionEventTypeArguments struct {
-	Argument []extensionEventTypeArgument `xml:"argument"`
-}
-
-type extensionEventTypeArgument struct {
-	Name string `xml:"name"`
-	Type string `xml:"type"`
-}
-
 //revive:disable:cognitive-complexity
 
 func (e Event) Target() string {
@@ -279,23 +264,33 @@ func GetEventInfo(ctx context.Context) ([]EventInfo, error) {
 
 	defer sx.Logout(ctx, c)
 
+	locale, err := sx.GetLocale(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
 	e, err := getEventManager(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 
-	ex, err := getExtensionManager(ctx, c)
+	l, err := GetLocalizationManager(ctx, c)
 	if err != nil {
 		return nil, err
 	}
 
-	eventEx := listExtentionEvent(ex)
+	ex, err := GetExtensionManager(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	eventEx := ListExtentionEvent(ex)
 
 	info := make([]EventInfo, len(e.Description.EventInfo)+len(eventEx))
 	collectEvent(ctx, e, &info)
 
 	infoEx := info[len(e.Description.EventInfo):]
-	collectExtensionEvent(ctx, eventEx, &infoEx)
+	CollectExtensionEvent(ctx, c, l, *locale, eventEx, &infoEx)
 
 	return info, nil
 }
@@ -380,32 +375,6 @@ func getEventManager(ctx context.Context, c *vim25.Client) (*mo.EventManager, er
 	return &e, nil
 }
 
-func getExtensionManager(ctx context.Context, c *vim25.Client) (*mo.ExtensionManager, error) {
-	if c.ServiceContent.ExtensionManager == nil {
-		return nil, nil
-	}
-
-	pc := property.DefaultCollector(c)
-
-	var e mo.ExtensionManager
-	_, err := sx.ExecCallAPI(
-		ctx,
-		func(cctx context.Context) (int, error) {
-			return 0, pc.RetrieveOne(
-				cctx,
-				*c.ServiceContent.ExtensionManager,
-				[]string{"extensionList"},
-				&e,
-			)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &e, nil
-}
-
 func getEventSeverity(em *mo.EventManager, evt *types.BaseEvent) string {
 	if e, ok := (*evt).(*types.EventEx); ok && e.Severity != "" {
 		return e.Severity
@@ -449,23 +418,6 @@ func getEventTypeID(evt *types.BaseEvent) string {
 	return typeID
 }
 
-func listExtentionEvent(em *mo.ExtensionManager) []*types.ExtensionEventTypeInfo {
-	eventEx := []*types.ExtensionEventTypeInfo{}
-	if em == nil {
-		return eventEx
-	}
-
-	for _, ext := range em.ExtensionList {
-		if ext.EventList != nil {
-			for _, evInfo := range ext.EventList {
-				eventEx = append(eventEx, &evInfo)
-			}
-		}
-	}
-
-	return eventEx
-}
-
 func collectEvent(ctx context.Context, e *mo.EventManager, info *[]EventInfo) {
 	for i, evInfo := range e.Description.EventInfo {
 		longDesc := EventLongDescription{}
@@ -486,35 +438,6 @@ func collectEvent(ctx context.Context, e *mo.EventManager, info *[]EventInfo) {
 			Description:     evInfo.Description,
 			Category:        evInfo.Category,
 			LongDescription: longDesc,
-		}
-	}
-}
-
-func collectExtensionEvent(
-	ctx context.Context,
-	evts []*types.ExtensionEventTypeInfo,
-	info *[]EventInfo,
-) {
-	for i, evInfo := range evts {
-		eventType := extensionEventType{}
-		if len(evInfo.EventTypeSchema) != Empty {
-			err := xml.Unmarshal([]byte(evInfo.EventTypeSchema), &eventType)
-			if err != nil {
-				slog.WarnContext(
-					ctx,
-					"Could not deserialize event type schema",
-					"error", err,
-					"schema", evInfo.EventTypeSchema,
-				)
-				eventType = extensionEventType{}
-			}
-		}
-
-		(*info)[i] = EventInfo{
-			Key:             evInfo.EventID,
-			Description:     eventType.Description,
-			Category:        "",
-			LongDescription: EventLongDescription{},
 		}
 	}
 }
