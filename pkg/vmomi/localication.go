@@ -83,6 +83,22 @@ func getLocalizationCatalogURI(
 	locale string,
 	moduleName string,
 ) *string {
+	uri := findLocalizationCatalogURI(lm, locale, moduleName)
+	if uri != nil {
+		return uri
+	}
+
+	//revive:disable:add-constant
+	locales := strings.SplitN(locale, "_", 2)
+	//revive:enable:add-constant
+	return findLocalizationCatalogURI(lm, locales[0], moduleName)
+}
+
+func findLocalizationCatalogURI(
+	lm *mo.LocalizationManager,
+	locale string,
+	moduleName string,
+) *string {
 	for _, catalog := range lm.Catalog {
 		if catalog.Locale == locale && catalog.ModuleName == moduleName {
 			return &catalog.CatalogUri
