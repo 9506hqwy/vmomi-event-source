@@ -19,6 +19,7 @@ import (
 const kvMin = int(1)
 
 var catalogCache = make(map[string]string, 0)
+var catalogTextCache = make(map[string]string, 0)
 
 func GetLocalizationManager(
 	ctx context.Context,
@@ -64,6 +65,12 @@ func GetLocalizationCatalogValue(
 
 	url := getLocalizationCatalogURI(lm, locale, moduleName)
 	if url == nil {
+		return nil, nil
+	}
+
+	catalogText := getCatalogTextFromCache(*url)
+	if catalogText != nil {
+		// Return if not found key in parsed content.
 		return nil, nil
 	}
 
@@ -113,6 +120,11 @@ func getLocalizationCatalog(
 	c *vim25.Client,
 	uri string,
 ) (*string, error) {
+	cached := getCatalogTextFromCache(uri)
+	if cached != nil {
+		return cached, nil
+	}
+
 	noVerifySSL, ok := ctx.Value(flag.TargetNoVerifySSLKey{}).(bool)
 	if !ok {
 		return nil, errors.New("target_no_verify_ssl not found in context")
@@ -137,6 +149,7 @@ func getLocalizationCatalog(
 	}
 
 	catalog := string(catalogBytes)
+	updateCatalogTextCache(uri, &catalog)
 
 	return &catalog, nil
 }
@@ -155,6 +168,19 @@ func updateCatalogCache(catalogText *string) {
 	for k, v := range catalog {
 		catalogCache[k] = v
 	}
+}
+
+func getCatalogTextFromCache(key string) *string {
+	value, ok := catalogTextCache[key]
+	if ok && value != "" {
+		return &value
+	}
+
+	return nil
+}
+
+func updateCatalogTextCache(key string, catalogText *string) {
+	catalogTextCache[key] = *catalogText
 }
 
 func parseCatalog(catalog *string) map[string]string {
