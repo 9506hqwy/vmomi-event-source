@@ -17,6 +17,7 @@ import (
 )
 
 const kvMin = int(1)
+const LineContinue = "\\"
 
 var catalogCache = make(map[string]string, 0)
 var catalogTextCache = make(map[string]string, 0)
@@ -156,7 +157,7 @@ func getLocalizationCatalog(
 
 func getCatalogValueFromCache(key string) *string {
 	value, ok := catalogCache[key]
-	if ok && value != "" {
+	if ok && len(value) != Empty {
 		return &value
 	}
 
@@ -172,7 +173,7 @@ func updateCatalogCache(catalogText *string) {
 
 func getCatalogTextFromCache(key string) *string {
 	value, ok := catalogTextCache[key]
-	if ok && value != "" {
+	if ok && len(value) != Empty {
 		return &value
 	}
 
@@ -183,21 +184,51 @@ func updateCatalogTextCache(key string, catalogText *string) {
 	catalogTextCache[key] = *catalogText
 }
 
+//revive:disable:cognitive-complexity
+
 func parseCatalog(catalog *string) map[string]string {
 	lines := strings.Split(*catalog, "\n")
 
 	values := make(map[string]string, len(lines))
-	for _, line := range lines {
-		kv := strings.SplitN(line, "=", kvMin+1)
-		if len(kv) > kvMin {
-			key := strings.TrimSpace(kv[0])
-			value := strings.TrimSpace(kv[1])
-			values[key] = strings.Trim(value, "\"")
+	//revive:disable:add-constant
+	for i := 0; i < len(lines); i++ {
+		//revive:enable:add-constant
+		line := lines[i]
+		if strings.HasPrefix(line, "#") {
+			continue
 		}
+
+		kv := strings.SplitN(line, "=", kvMin+1)
+		if len(kv) <= kvMin {
+			continue
+		}
+
+		key := strings.TrimSpace(kv[0])
+		value := strings.TrimSpace(kv[1])
+
+		var valueBuilder strings.Builder
+		_, err := valueBuilder.WriteString(strings.TrimSuffix(value, LineContinue))
+		if err != nil {
+			panic(err)
+		}
+
+		for strings.HasSuffix(value, "\\") {
+			// Continue if line ends with backslash.
+			i++
+			value = lines[i]
+			_, err = valueBuilder.WriteString(strings.TrimSuffix(value, LineContinue))
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		values[key] = strings.Trim(valueBuilder.String(), "\"")
 	}
 
 	return values
 }
+
+//revive:enable:cognitive-complexity
 
 func createRequest(
 	ctx context.Context,
