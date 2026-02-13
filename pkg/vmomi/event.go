@@ -109,6 +109,16 @@ func Query(ctx context.Context) ([]Event, error) {
 
 	defer sx.Logout(ctx, c)
 
+	locale, err := sx.GetLocale(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cacheLocalizationCatalogAll(ctx, c, *locale)
+	if err != nil {
+		return nil, err
+	}
+
 	em := event.NewManager(c)
 
 	collector, err := createEventCollector(ctx, em)
@@ -151,6 +161,16 @@ func Poll(
 	}
 
 	defer sx.Logout(ctx, c)
+
+	locale, err := sx.GetLocale(ctx, c)
+	if err != nil {
+		return err
+	}
+
+	err = cacheLocalizationCatalogAll(ctx, c, *locale)
+	if err != nil {
+		return err
+	}
 
 	em := event.NewManager(c)
 
@@ -376,11 +396,19 @@ func getEventManager(ctx context.Context, c *vim25.Client) (*mo.EventManager, er
 }
 
 func getEventSeverity(em *mo.EventManager, evt *types.BaseEvent) string {
-	if e, ok := (*evt).(*types.EventEx); ok && e.Severity != "" {
-		return e.Severity
+	typeID := getEventTypeID(evt)
+
+	severity := getCatalogCategory(typeID)
+	if severity != nil && containsCategoryKey(em, *severity) {
+		return *severity
 	}
 
-	typeID := getEventTypeID(evt)
+	if e, ok := (*evt).(*types.EventEx); ok && e.Severity != "" {
+		if containsCategoryKey(em, e.Severity) {
+			return e.Severity
+		}
+	}
+
 	return getCategoryKey(em, typeID)
 }
 

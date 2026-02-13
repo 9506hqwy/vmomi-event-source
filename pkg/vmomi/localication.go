@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -84,6 +85,36 @@ func GetLocalizationCatalogValue(
 
 	value = getCatalogValueFromCache(key)
 	return value, nil
+}
+
+func cacheLocalizationCatalogAll(
+	ctx context.Context,
+	c *vim25.Client,
+	locale string,
+) error {
+	lm, err := GetLocalizationManager(ctx, c)
+	if err != nil {
+		return err
+	}
+
+	ex, err := GetExtensionManager(ctx, c)
+	if err != nil {
+		return err
+	}
+
+	if ex == nil {
+		_, err = GetLocalizationCatalogValue(ctx, c, lm, locale, "hostdiag", "dummy key")
+		return err
+	}
+
+	for _, e := range ex.ExtensionList {
+		_, err = GetLocalizationCatalogValue(ctx, c, lm, locale, e.Key, "dummy key")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func getLocalizationCatalogURI(
@@ -261,4 +292,9 @@ func send(req *http.Request, tlsConfig *tls.Config) (*http.Response, error) {
 	}
 
 	return res, nil
+}
+
+func getCatalogCategory(eventID string) *string {
+	catalogKey := fmt.Sprintf("%s.category", eventID)
+	return getCatalogValueFromCache(catalogKey)
 }
