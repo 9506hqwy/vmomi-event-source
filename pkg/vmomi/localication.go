@@ -108,7 +108,9 @@ func findLocalizationCatalogURI(
 	moduleName string,
 ) *string {
 	for _, catalog := range lm.Catalog {
-		if catalog.Locale == locale && catalog.ModuleName == moduleName {
+		if catalog.CatalogName == "event" &&
+			catalog.Locale == locale &&
+			catalog.ModuleName == moduleName {
 			return &catalog.CatalogUri
 		}
 	}
