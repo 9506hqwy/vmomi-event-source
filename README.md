@@ -1,23 +1,23 @@
 # VMOMI Event Source
 
-This repository provides event source for vSphere infrastructure.
-It collects and push vSphere infrastructure events to Grafana Loki.
+This repository provides the event source for vSphere infrastructure.
+It collects and pushes vSphere infrastructure events to Grafana Loki.
 
 ## Features
 
-- Collects vSphere infrastructure events in realtime
+- Collects vSphere infrastructure events in real time
 - Pushes events to Grafana Loki
 
 ### Labels and Metadata
 
-Expose event with follow labels.
+Each event includes the following labels.
 
 | Label        | Description        |
 | :----------- | :----------------- |
 | severity     | Severity for event |
 | service_name | Service name       |
 
-Expose event with follow metadata.
+Each event also includes the following structured metadata.
 
 | Name                       | Description                           |
 | :------------------------- | :------------------------------------ |
@@ -34,13 +34,13 @@ Expose event with follow metadata.
 
 ## Build
 
-Build binary.
+To build the binary.
 
 ```sh
 go build -o bin/vmomi-event-source ./cmd/vmomi-event-source
 ```
 
-Or build container image.
+To build the container image.
 
 ```sh
 docker build -t vmomi-event-source .
@@ -50,7 +50,7 @@ Add `Z` option at bind mount operation in *Dockerfile* if using podman with SELi
 
 ## Usage
 
-Run application.
+Run the application.
 
 ```sh
 $ ./bin/vmomi-event-source loki collect -h
@@ -76,7 +76,7 @@ Global Flags:
       --user string                vSphere server username.
 ```
 
-Set environment variable instead of arguments.
+You can also configure the application using environment variables.
 
 | Argument             | Environment Variable                    |
 | :------------------- | :-------------------------------------- |
@@ -91,7 +91,7 @@ Set environment variable instead of arguments.
 | --url                | VMOMI_EVENT_SOURCE_TARGET_URL           |
 | --user               | VMOMI_EVENT_SOURCE_TARGET_USER          |
 
-Or run container.
+Run the container.
 
 ```sh
 docker run -d \
@@ -104,5 +104,5 @@ docker run -d \
 
 ## Notes
 
-- Occur HTTP 400 error if event happend date is too old.
-  Confgirue `reject_old_samples_max_age`. see [limits_config](https://grafana.com/docs/loki/latest/configure/#limits_config).
+- If you encounter HTTP 400 errors due to old event dates,
+  configure reject_old_samples_max_age in Loki [limits_config](https://grafana.com/docs/loki/latest/configure/#limits_config).
