@@ -64,6 +64,7 @@ Flags:
   -v, --version   version for collect
 
 Global Flags:
+      --config string              Config file path.
       --log-level string           Log level. (default "INFO")
       --loki-no-verify-ssl         Skip SSL verification.
       --loki-service-name string   Loki service name. (default "vmomi-event-source")
@@ -80,6 +81,7 @@ You can also configure the application using environment variables.
 
 | Argument             | Environment Variable                    |
 | :------------------- | :-------------------------------------- |
+| --config             | VMOMI_EVENT_SOURCE_CONFIG               |
 | --log-level          | VMOMI_EVENT_SOURCE_LOG_LEVEL            |
 | --loki-no-verify-ssl | VMOMI_EVENT_SOURCE_LOKI_NO_VERIFY_SSL   |
 | --loki-service-name  | VMOMI_EVENT_SOURCE_LOKI_SERVICE_NAME    |
@@ -101,6 +103,27 @@ docker run -d \
     -e VMOMI_EVENT_SOURCE_LOKI_URL=<URL> \
     vmomi-event-source loki collect
 ```
+
+## Configuration
+
+Configure the event source using the `--config` option. See [examples/excludes.yaml](./examples/excludes.yaml) for a example.
+
+### Default Configuration
+
+The default configuration is to collect all event.
+
+```yaml
+excludes: []
+```
+
+### Definition
+
+`excludes` defines the ignored event.
+
+| key                    | valye                                   |
+| :--------------------- | :-------------------------------------- |
+| excludes               | List exclude event.                     |
+| excludes.event_type_id | `event_type_id` in structured metadata. |
 
 ## Notes
 

@@ -14,6 +14,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/vmware/govmomi v0.52.0
+	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	google.golang.org/protobuf v1.36.11
 )
 

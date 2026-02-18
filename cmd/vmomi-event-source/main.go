@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/9506hqwy/vmomi-event-source/pkg/config"
 	"github.com/9506hqwy/vmomi-event-source/pkg/flag"
 	"github.com/9506hqwy/vmomi-event-source/pkg/loki"
 	"github.com/9506hqwy/vmomi-event-source/pkg/vmomi"
@@ -46,6 +47,32 @@ var categoryCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalf("Print error: %v", err)
 			}
+		}
+	},
+}
+
+var configCmd = &cobra.Command{
+	Use:     "config",
+	Short:   "VMOMI Event Source Config",
+	Long:    "VMOMI Event Source Config",
+	Version: fmt.Sprintf("%s\nCommit: %s", version, commit),
+	Run: func(_ *cobra.Command, _ []string) {
+		ctx := context.Background()
+		ctx = fromArgument(ctx)
+
+		cfg, err := config.GetConfig(ctx)
+		if err != nil {
+			log.Fatalf("GetConfig error: %v", err)
+		}
+
+		conf, err := config.EncodeConfig(cfg)
+		if err != nil {
+			log.Fatalf("EncodeConfig error: %v", err)
+		}
+
+		_, err = fmt.Print(conf)
+		if err != nil {
+			log.Fatalf("Print error: %v", err)
 		}
 	},
 }
@@ -256,6 +283,7 @@ func fromArgument(ctx context.Context) context.Context {
 	ctx = context.WithValue(ctx, flag.TargetNoVerifySSLKey{}, viper.GetBool("target_no_verify_ssl"))
 	ctx = context.WithValue(ctx, flag.TargetTimeoutKey{}, viper.GetInt("target_timeout"))
 	ctx = context.WithValue(ctx, flag.LogLevelKey{}, viper.GetString("log_level"))
+	ctx = context.WithValue(ctx, flag.LokiConfigKey{}, viper.GetString("config"))
 
 	ctx = context.WithValue(ctx, flag.LokiURLKey{}, viper.GetString("loki_url"))
 	ctx = context.WithValue(ctx, flag.LokiTenantIDKey{}, viper.GetString("loki_tenant"))
@@ -275,6 +303,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-verify-ssl", false, "Skip SSL verification.")
 	rootCmd.PersistentFlags().Int("timeout", 10, "API call timeout seconds.")
 	rootCmd.PersistentFlags().String("log-level", "INFO", "Log level.")
+	rootCmd.PersistentFlags().String("config", "", "Config file path.")
 
 	waitCmd.Flags().Int32("timeout", 60, "Timeout in seconds.")
 
@@ -286,6 +315,7 @@ func init() {
 	lokiTestCmd.Flags().String("message", "Test message", "Message to send.")
 
 	rootCmd.AddCommand(categoryCmd)
+	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(enumeratedCmd)
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(eventCmd)
@@ -301,6 +331,7 @@ func init() {
 	viper.BindPFlag("target_no_verify_ssl", rootCmd.PersistentFlags().Lookup("no-verify-ssl"))
 	viper.BindPFlag("target_timeout", rootCmd.PersistentFlags().Lookup("timeout"))
 	viper.BindPFlag("log_level", rootCmd.Flags().Lookup("log-level"))
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 
 	viper.BindPFlag("loki_url", lokiCmd.PersistentFlags().Lookup("loki-url"))
 	viper.BindPFlag("loki_tenant", lokiCmd.PersistentFlags().Lookup("tenant"))

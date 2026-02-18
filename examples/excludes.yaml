@@ -1,0 +1,3 @@
+excludes:
+    - event_type_id: UserLoginSessionEvent
+    - event_type_id: UserLogoutSessionEvent

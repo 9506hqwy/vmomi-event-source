@@ -7,6 +7,7 @@ type TargetUserKey struct{}
 type TargetPasswordKey struct{}
 type TargetNoVerifySSLKey struct{}
 type TargetTimeoutKey struct{}
+type LokiConfigKey struct{}
 type LokiNoVerifySSLKey struct{}
 type LokiServiceNameKey struct{}
 type LokiURLKey struct{}
