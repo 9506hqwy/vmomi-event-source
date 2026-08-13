@@ -15,7 +15,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/vmware/govmomi v0.55.1
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
