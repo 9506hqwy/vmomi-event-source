@@ -10,7 +10,7 @@ tool (
 )
 
 require (
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/vmware/govmomi v0.55.1
